@@ -1619,6 +1619,8 @@ namespace OSCR::Cores::GameBoyAdvance
 
     OSCR::Storage::Shared::createFile(FS(OSCR::Strings::FileType::GameBoyAdvance), FS(OSCR::Strings::Directory::Save), fileName, FS(OSCR::Strings::FileType::SaveFlash));
 
+    OSCR::UI::ProgressBar::init(flashSize, 1);
+
     OSCR::UI::printSync(FS(OSCR::Strings::Status::Reading));
 
     cartOn();
@@ -1655,6 +1657,8 @@ namespace OSCR::Cores::GameBoyAdvance
         }
 
         OSCR::Storage::Shared::writeBuffer();
+
+        OSCR::UI::ProgressBar::advance(512);
       }
 
       PORTH |= (1 << 0); // Set CS_FLASH(PH0) high
@@ -1667,6 +1671,8 @@ namespace OSCR::Cores::GameBoyAdvance
     cartOff();
 
     OSCR::UI::printLine(FS(OSCR::Strings::Common::DONE));
+
+    OSCR::UI::ProgressBar::finish();
   }
 
   void busyCheck(uint16_t currByte)
@@ -2708,7 +2714,7 @@ namespace OSCR::Cores::GameBoyAdvance
   {
     uint8_t blockNumber;
 
-    if (option) blockNumber = OSCR::UI::rangeSelect(F("BLOCK NUMBER"), 0, 63);
+    if (option) blockNumber = OSCR::UI::rangeSelect(FS(OSCR::Strings::Common::Block), 0, 63);
     else blockNumber = OSCR::UI::rangeSelect(FS(OSCR::Strings::Headings::SelectCartSize), 0, 32);
 
     if (option)
@@ -2728,8 +2734,12 @@ namespace OSCR::Cores::GameBoyAdvance
   // Read 369-in-1 repro
   void read369in1(uint8_t blockNumber, uint8_t fileSizeByte)
   {
+    uint32_t startBank, startBlock;
+    uint32_t lastBlock = 0x2000000;
+    uint32_t lastBuffer = 0x400000;
     uint8_t readBuffer[1024];
-    strcpy_P(fileName, PSTR("369in1"));
+
+    setOutName_P(PSTR("369in1"));
 
     if (blockNumber != 0)
     {
@@ -2748,16 +2758,17 @@ namespace OSCR::Cores::GameBoyAdvance
       fileSize = (uint32_t)fileSizeByte * 1024 * 1024;
 
     // 64 blocks at 4MB each
-    uint32_t startBank = (((uint32_t)blockNumber * 4) / 32) * 0x2000000;
-    uint32_t startBlock = ((uint32_t)blockNumber * 4 * 1024 * 1024) - startBank;
-    uint32_t lastBlock = 0x2000000;
+    startBank = (((uint32_t)blockNumber * 4) / 32) * 0x2000000;
+    startBlock = ((uint32_t)blockNumber * 4 * 1024 * 1024) - startBank;
+
     if (fileSize < lastBlock)
+    {
       lastBlock = startBlock + fileSize;
-    uint32_t lastBuffer = 0x400000;
+    }
+
     if (fileSize < lastBuffer)
       lastBuffer = fileSize;
 
-    //Initialize progress bar
     OSCR::UI::ProgressBar::init(fileSize);
 
     // 256MB repro size
