@@ -36,6 +36,7 @@ class DynamicClockSerial : public HardwareSerial
 
 public:
   // Various functions to allow parameter omission and automatic handling.
+  void begin();
   void begin(uint32_t baud);
   void begin(uint32_t baud, uint8_t config);
   void begin(uint32_t baud, uint32_t sclock);

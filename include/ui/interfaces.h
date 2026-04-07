@@ -810,8 +810,8 @@ namespace OSCR
      *
      * @deprecated
      */
-    //inline void print(double number, int digits = 1) = delete;
-    //inline void printSync(double number, int digits = 1) = delete;
+    inline void print(double number, int digits = 1) = delete;
+    inline void printSync(double number, int digits = 1) = delete;
 
     /**
      * Printing doubles is expensive (~1KB), so we don't do it.
@@ -824,8 +824,8 @@ namespace OSCR
      *
      * @deprecated
      */
-    //inline void printLine(double number, int digits = 1) = delete;
-    //inline void printLineSync(double number, int digits = 1) = delete;
+    inline void printLine(double number, int digits = 1) = delete;
+    inline void printLineSync(double number, int digits = 1) = delete;
 
     /**
      * Move the cursor to the start of a line relative to the current

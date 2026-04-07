@@ -37,6 +37,55 @@
 # include <util/atomic.h>
 # include "common/Power.h"
 
+# define F_CPU_FULL (F_CPU)
+# define F_CPU_HALF (F_CPU / 2)
+
+# if defined(ENABLE_STATIC_BAUD)
+#   define MIN_BAUD_HIGH (((F_CPU_FULL / 4) / 8191) + 1)
+#   define MIN_BAUD_LOW (((F_CPU_HALF / 4) / 8191) + 1)
+
+#   if ((OSCR_BAUD < MIN_BAUD_HIGH) || (OSCR_BAUD == 57600))
+#     define U2X_NEVER
+#     define BAUD_SETTING_HIGH ((((F_CPU_FULL / 8) / OSCR_BAUD) - 1) / 2)
+#     define BAUD_SETTING_LOW  ((((F_CPU_HALF / 8) / OSCR_BAUD) - 1) / 2)
+#   elif (OSCR_BAUD > MIN_BAUD_LOW)
+#     define U2X_ALWAYS
+#     define BAUD_SETTING_HIGH ((((F_CPU_FULL / 4) / OSCR_BAUD) - 1) / 2)
+#     define BAUD_SETTING_LOW  ((((F_CPU_HALF / 4) / OSCR_BAUD) - 1) / 2)
+#   else
+#     define U2X_WHEN_HIGH
+#     define BAUD_SETTING_HIGH ((((F_CPU_FULL / 4) / OSCR_BAUD) - 1) / 2)
+#     define BAUD_SETTING_LOW  ((((F_CPU_HALF / 8) / OSCR_BAUD) - 1) / 2)
+#   endif
+
+
+constexpr uint32_t const kBaudSettingHigh = BAUD_SETTING_HIGH;
+constexpr uint32_t const kBaudSettingLow = BAUD_SETTING_LOW;
+
+# else
+#   define F_CPU_FULL_DIV_4 (F_CPU_FULL / 4)
+#   define F_CPU_FULL_DIV_8 (F_CPU_FULL / 8)
+
+#   define F_CPU_HALF_DIV_4 (F_CPU_HALF / 4)
+#   define F_CPU_HALF_DIV_8 (F_CPU_HALF / 8)
+
+#   define MIN_BAUD_HIGH ((F_CPU_FULL_DIV_4 / 8191) + 1)
+#   define MIN_BAUD_LOW ((F_CPU_HALF_DIV_4 / 8191) + 1)
+
+constexpr uint32_t const kCPUHigh = F_CPU_FULL;
+constexpr uint32_t const kCPULow = F_CPU_HALF;
+
+constexpr uint32_t const kDivHighFCPU4 = F_CPU_FULL_DIV_4;
+constexpr uint32_t const kDivHighFCPU8 = F_CPU_FULL_DIV_8;
+
+constexpr uint32_t const kDivLowFCPU4 = F_CPU_HALF_DIV_4;
+constexpr uint32_t const kDivLowFCPU8 = F_CPU_HALF_DIV_8;
+
+constexpr uint32_t const kBaudMinimumHigh = MIN_BAUD_HIGH;
+constexpr uint32_t const kBaudMinimumLow = MIN_BAUD_LOW;
+# endif
+
+
 /**
  * @brief Serial interface that supports a dynamic clock speed
  *
@@ -61,6 +110,7 @@ void DynamicClockSerial::begin(uint32_t baud, uint8_t config, uint32_t sclock)
 # if defined(__AVR_ATmega8__)
   config |= 0x80; // select UCSRC register (shared with UBRRH)
 # endif
+
   *_ucsrc = config;
 
   sbi(*_ucsrb, RXEN0);
@@ -69,33 +119,74 @@ void DynamicClockSerial::begin(uint32_t baud, uint8_t config, uint32_t sclock)
   cbi(*_ucsrb, UDRIE0);
 }
 
+void DynamicClockSerial::begin()
+{
+  begin(OSCR_BAUD, SERIAL_8N1, OSCR::Clock::getClock());
+}
+
 void DynamicClockSerial::begin(uint32_t baud)
 {
+# if defined(ENABLE_STATIC_BAUD)
+  begin();
+# else
   begin(baud, SERIAL_8N1, OSCR::Clock::getClock());
+# endif
 }
 
 void DynamicClockSerial::begin(uint32_t baud, uint8_t config)
 {
+# if defined(ENABLE_STATIC_BAUD)
+  begin(OSCR_BAUD, config, OSCR::Clock::getClock());
+# else
   begin(baud, config, OSCR::Clock::getClock());
+# endif
 }
 
 void DynamicClockSerial::begin(uint32_t baud, uint32_t sclock)
 {
+# if defined(ENABLE_STATIC_BAUD)
+  begin(OSCR_BAUD, SERIAL_8N1, sclock);
+# else
   begin(baud, SERIAL_8N1, sclock);
+# endif
 }
 
 void DynamicClockSerial::clockSkew(uint32_t sclock)
 {
   if (clockSpeed == sclock) return; // unchanged
 
-  uint16_t baud_setting = (sclock / 4 / baudRate - 1) / 2;
-  uint8_t ucsra_setting = 1 << U2X0;
+# if defined(ENABLE_STATIC_BAUD)
+  uint16_t baud_setting = (F_CPU_FULL == sclock) ? kBaudSettingHigh : kBaudSettingLow;
 
-  if (((sclock == 16000000UL) && (baudRate == 57600)) || (baud_setting > 4095))
+#   if defined(U2X_NEVER)
+  uint16_t const ucsra_setting = 0;
+#   elif defined(U2X_ALWAYS)
+  uint16_t const ucsra_setting = 1 << U2X0;
+#   else
+  uint16_t const ucsra_setting = (F_CPU_FULL == sclock) ? (1 << U2X0) : 0;
+#   endif
+
+# else
+  uint16_t baud_setting, ucsra_setting;
+  uint16_t const minimumBaud = ((F_CPU == sclock) ? kBaudMinimumHigh : kBaudMinimumLow);
+  uint16_t const clockDiv4 = (F_CPU == sclock) ? kDivHighFCPU4 : kDivLowFCPU4;
+  uint16_t const clockDiv8 = (F_CPU == sclock) ? kDivHighFCPU8 : kDivLowFCPU8;
+
+#   if defined(__ATMEGA8U2_USB_TO_UART__)
+  if (((sclock == F_CPU) && (baud == 57600)) || (baudRate < minimumBaud))
+#   else
+  if (baudRate < minimumBaud)
+#   endif
   {
-    baud_setting = (sclock / 8 / baudRate - 1) / 2;
+    baud_setting = (clockDiv8 / baudRate - 1) / 2;
     ucsra_setting = 0;
   }
+  else
+  {
+    baud_setting = (clockDiv4 / baudRate - 1) / 2;
+    ucsra_setting = 1 << U2X0;
+  }
+# endif
 
   /**
    * Flush buffer first or the data will corrupt.

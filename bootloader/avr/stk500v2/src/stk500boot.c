@@ -125,16 +125,14 @@ GNU General Public License for more details.
 static void RunMonitor(void);
 #endif
 
-#if !defined(NO_DEFAULTS)
-
 //#define _DEBUG_SERIAL_
 //#define _DEBUG_WITH_LEDS_
 
 /**
  * OSCR-specific options
  */
-//#define ENABLE_ONBOARD_ATMEGA
-//#define ENABLE_VSELECT
+//#define ENABLE_ONBOARD_ATMEGA 1
+//#define ENABLE_VSELECT 3
 
 /**
  * Uncomment the following lines to save code space
@@ -144,25 +142,65 @@ static void RunMonitor(void);
 //#define REMOVE_CMD_SPI_MULTI    // required by avrdude
 //
 
-# if defined(ENABLE_ONBOARD_ATMEGA)
-// OBMEGA assumes VSELECT
-#   if !defined(ENABLE_VSELECT)
-#     define ENABLE_VSELECT
-#   endif
-
-// OBMEGA has no LED
-#   if !defined(REMOVE_BOOTLOADER_LED)
-#     define REMOVE_BOOTLOADER_LED
-#   endif
-
-// OBMEGA needs this
-#   if defined(REMOVE_CMD_SPI_MULTI)
-#     undef REMOVE_CMD_SPI_MULTI
-#   endif
+#if !defined(ENABLE_ONBOARD_ATMEGA)
+# define ENABLE_ONBOARD_ATMEGA 0
+#else
+# if !((ENABLE_ONBOARD_ATMEGA == 0) || (ENABLE_ONBOARD_ATMEGA == 1) || (ENABLE_ONBOARD_ATMEGA == 3) || (ENABLE_ONBOARD_ATMEGA == 5))
+#   error Invalid value for ENABLE_ONBOARD_ATMEGA, needs to be 0 (off) or 1 (on)
 # endif
-
 #endif
 
+#if ENABLE_ONBOARD_ATMEGA
+# if ((ENABLE_ONBOARD_ATMEGA == 3) || (ENABLE_ONBOARD_ATMEGA == 5))
+#   if (defined(ENABLE_VSELECT))
+#     if ((ENABLE_ONBOARD_ATMEGA == 3) && (ENABLE_VSELECT == 5))
+#       error ENABLE_ONBOARD_ATMEGA was 3, but ENABLE_VSELECT was 5.
+#     elif ((ENABLE_ONBOARD_ATMEGA == 5) && (ENABLE_VSELECT == 3))
+#       error ENABLE_ONBOARD_ATMEGA was 5, but ENABLE_VSELECT was 3.
+#     elif (ENABLE_VSELECT == 0)
+#       error A voltage for ENABLE_ONBOARD_ATMEGA was set, but ENABLE_VSELECT was explicitly set to 0 (off).
+#     elif (ENABLE_VSELECT == 1)
+#       undef ENABLE_VSELECT
+#       if (ENABLE_ONBOARD_ATMEGA == 5)
+#         define ENABLE_VSELECT 5
+#       else
+#         define ENABLE_VSELECT 3
+#       endif
+//    else - ENABLE_VSELECT has a bad value -> but we catch it in the vselect section, so it doesn't need checked here
+#     endif
+#   else
+#     define ENABLE_VSELECT 3
+#   endif
+#   undef ENABLE_ONBOARD_ATMEGA
+#   define ENABLE_ONBOARD_ATMEGA 1
+# elif !defined(NO_DEFAULTS) && !defined(ENABLE_VSELECT)
+#   define ENABLE_VSELECT 5
+#   warning "!! ENABLE_ONBOARD_ATMEGA: ENABLE_VSELECT wasn't specified, ** assuming *5V* ** !!"
+# endif
+
+// OBMEGA has no LED
+# if !defined(REMOVE_BOOTLOADER_LED)
+#   define REMOVE_BOOTLOADER_LED
+# endif
+
+// OBMEGA needs this
+# if defined(REMOVE_CMD_SPI_MULTI)
+#   undef REMOVE_CMD_SPI_MULTI
+# endif
+#endif /* ENABLE_ONBOARD_ATMEGA */
+
+#if !defined(ENABLE_VSELECT)
+# define ENABLE_VSELECT 0
+#else
+# if !((ENABLE_VSELECT == 0) || (ENABLE_VSELECT == 1) || (ENABLE_VSELECT == 3) || (ENABLE_VSELECT == 5))
+#   error Invalid value for ENABLE_VSELECT
+# endif
+# if (ENABLE_VSELECT == 1)
+#   undef ENABLE_VSELECT
+#   define ENABLE_VSELECT 3
+#   warning "ENABLE_VSELECT was set to 1 instead of a specific voltage, assuming 3.3V was intended."
+# endif
+#endif
 
 //************************************************************************
 //* LED on pin "PROGLED_PIN" on port "PROGLED_PORT"
@@ -578,7 +616,7 @@ int main(void)
   asm volatile ( "ldi 16, %0" :: "i" (RAMEND & 0x0FF) );
   asm volatile ( "out %0,16" :: "i" (AVR_STACK_POINTER_LO_ADDR) );
 
-#if defined(ENABLE_ONBOARD_ATMEGA)
+#if ENABLE_ONBOARD_ATMEGA
   /**
    * Reset all GPIO
    */
@@ -595,8 +633,22 @@ int main(void)
   // - Encoder (2-3)
   // - STAT RGB LED (4-6)
   // - VSELECT EN (7)
+# if ENABLE_VSELECT
   DDRD = 0b11110000;
+# else /* !ENABLE_VSELECT */
+  DDRD = 0b01110000;
+# endif /* ENABLE_VSELECT */
+
+# if ENABLE_VSELECT
+#   if ENABLE_VSELECT == 5
+  PORTD = 0b01111100; // Boot in 5V mode
+#   else
+  PORTD = 0b11111100; // Boot in 3V3 mode
+#   endif
+# else
   PORTD = 0b01111100;
+# endif
+
 
   // VSELECT STAT (6) + UART (0-1)
   DDRE = 0b00000001;
@@ -625,7 +677,7 @@ int main(void)
 
   DDRL = 0;
   PORTL = 0;
-#elif defined(ENABLE_VSELECT)
+#elif ENABLE_VSELECT
   DDRD |= (1 << 7);
 #endif
 
@@ -665,7 +717,7 @@ int main(void)
    * Branch to bootloader or application code ?
    */
 
-#if defined(ENABLE_ONBOARD_ATMEGA)
+#if ENABLE_ONBOARD_ATMEGA
   PORTD &= ~((1 << 4) | (1 << 5)); // Red LED + Green LED
 #elif !defined(REMOVE_BOOTLOADER_LED)
   /* PROG_PIN pulled low, indicate with LED that bootloader is active */
@@ -727,7 +779,7 @@ int main(void)
       if ((boot_timer % _BLINK_LOOP_COUNT_) == 0)
       {
         //* toggle the LED
-# if defined(ENABLE_ONBOARD_ATMEGA)
+# if ENABLE_ONBOARD_ATMEGA
         PORTD ^= (1 << 5); // Green LED
 # else
         PROGLED_PORT ^= (1<<PROGLED_PIN); // turn LED ON
@@ -741,7 +793,7 @@ int main(void)
 
   if (boot_state==1)
   {
-#if defined(ENABLE_VSELECT)
+#if ENABLE_VSELECT == 3
     // Program @ 5V
     PORTD &= ~(1 << 7);
 #endif
@@ -1181,7 +1233,7 @@ int main(void)
       sendchar(checksum);
       seqNum++;
 
-#if defined(ENABLE_ONBOARD_ATMEGA)
+#if ENABLE_ONBOARD_ATMEGA
       PORTD ^= (1 << 5); // Green LED toggle
 #elif !defined(REMOVE_BOOTLOADER_LED)
       //* <MLS> toggle the LED
@@ -1191,7 +1243,7 @@ int main(void)
     }
   }
 
-#if defined(ENABLE_VSELECT)
+#if ENABLE_VSELECT == 3
   // Idle @ 3.3V
   PORTD |= (1 << 7);
 #endif
@@ -1224,7 +1276,7 @@ int main(void)
 #endif
 
 
-#if defined(ENABLE_ONBOARD_ATMEGA)
+#if ENABLE_ONBOARD_ATMEGA
   PORTD &= ~(1 << 5);
 #elif !defined(REMOVE_BOOTLOADER_LED)
   PROGLED_DDR  &= ~(1<<PROGLED_PIN); // set to default

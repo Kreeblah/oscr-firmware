@@ -890,7 +890,7 @@
 //
 //
 
-#define UPD_BAUD 9600
+#define OSCR_BAUD 250000
 
 #if (HW_VERSION == 5)
 

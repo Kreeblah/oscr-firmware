@@ -1,4 +1,4 @@
-import click # pyright: ignore[reportMissingImports]
+import click
 from os import getcwd
 from os.path import join, isfile
 from SCons.Script import ARGUMENTS # pyright: ignore[reportMissingImports]
@@ -31,6 +31,8 @@ envglobal = DefaultEnvironment() # pyright: ignore[reportUndefinedVariable]
 envs.append(envglobal)
 
 platform = env.PioPlatform()
+boardConf = env.BoardConfig()
+projConf = env.GetProjectConfig()
 
 coreConfig = crutils.CRConfig(env)
 
@@ -61,6 +63,9 @@ if not isfile(userFile) and isfile(userFileNew):
 
 cpp_standard = env.GetProjectOption("cppstd");
 c_standard = env.GetProjectOption("cstd");
+bootloader_protocol = boardConf.get("bootloader", {}).get("protocol", "avrisp")
+bootloader_port = boardConf.get("bootloader", {}).get("port", "COM7")
+bootloader_speed = boardConf.get("bootloader", {}).get("upload_speed", "19200")
 
 flags = {
     "CC": [ # C and C++ flags
@@ -112,6 +117,31 @@ for _env in envs:
         ],
         UPLOADCMD="$UPLOADER $UPLOADERFLAGS -U flash:w:$SOURCES:i",
         UPLOADEEPCMD="$UPLOADER $UPLOADERFLAGS -U eeprom:w:$SOURCES:i",
+        FUSESUPLOADERFLAGS=[
+            "-p",
+            "$BOARD_MCU",
+            "-C",
+            join(AVRGGC_BINDIR, "avrdude.conf"),
+            "-e",
+            "-c",
+            bootloader_protocol,
+            "-P",
+            bootloader_port,
+            "-b",
+            bootloader_speed,
+        ],
+        BOOTUPLOADERFLAGS=[
+            "-p",
+            "$BOARD_MCU",
+            "-C",
+            join(AVRGGC_BINDIR, "avrdude.conf"),
+            "-c",
+            bootloader_protocol,
+            "-P",
+            bootloader_port,
+            "-b",
+            bootloader_speed,
+        ],
     )
 
     _env.PrependENVPath(
@@ -124,6 +154,11 @@ if VERBOSE:
     click.echo("+ C flags: " + env['CFLAGS'])
     click.echo("+ CXX flags: " + env['CXXFLAGS'])
     click.echo("+ Linker flags: " + env['LINKFLAGS'])
+    click.echo("")
+    click.echo("+ Uploader flags: " + ' '.join(env['UPLOADERFLAGS']))
+    click.echo("+ Fuse uploader flags: " + ' '.join(env['FUSESUPLOADERFLAGS'] if 'FUSESUPLOADERFLAGS' in env else []))
+    click.echo("+ Burn bootloader flags: " + ' '.join(env['BOOTUPLOADERFLAGS'] if 'BOOTUPLOADERFLAGS' in env else []))
+    click.echo("+ Bootloader flags: " + ' '.join(env['BOOTFLAGS'] if 'BOOTFLAGS' in env else []))
     click.echo("")
     click.echo("+ Defines")
     for define in confDefines:

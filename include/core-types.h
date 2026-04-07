@@ -148,7 +148,7 @@ namespace OSCR
     ClockGen,             //!< Clock Generator
     VSelect,              //!< Automatic Voltage Select (VSELECT) via TPS211x
     RealTimeClock,        //!< RTC Support
-    ClockGenCalibrated,    //!< Support for calibrating the clock generator
+    ClockGenCalibrated,   //!< Support for calibrating the clock generator
     ClockGenCalibration,  //!< Load clock generator calibration data
     OnBoardMega,          //!< Enable on-board ATmega2560 options
     StabilityFix,         //!< Fix for ATmega2560s with stability issues at 3.3V

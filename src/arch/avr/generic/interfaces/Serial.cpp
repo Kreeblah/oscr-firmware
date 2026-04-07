@@ -3,8 +3,6 @@
 
 #if defined(OSCR_ARCH_AVR)
 
-# include "config.h"
-
 # if defined(ENABLE_SERIAL_OUTPUT) || defined(ENABLE_UPDATER)
 
 #   include "arch/avr/generic/interfaces/Serial.h"
@@ -15,11 +13,6 @@
 namespace OSCR::Serial
 {
   char command[commandMax];
-#   if defined(ENABLE_SERIAL_ANSI)
-  constexpr uint32_t const baud = 115200;
-#   else /* !ENABLE_SERIAL_ANSI */
-  constexpr uint32_t const baud = UPD_BAUD;
-#   endif /* ENABLE_SERIAL_ANSI */
 
 #   if SERIAL_TX_BUFFER_SIZE < 256
   constexpr uint8_t kTxBufferSize = (SERIAL_TX_BUFFER_SIZE - 1);
@@ -41,7 +34,7 @@ namespace OSCR::Serial
 
   void begin()
   {
-    ClockedSerial.begin(baud);
+    ClockedSerial.begin();
   }
 
   void begin(uint32_t b)

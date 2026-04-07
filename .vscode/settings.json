@@ -2,7 +2,9 @@
   "files.associations": {
     "new": "cpp",
     "*.def": "cpp",
-    "chrono": "cpp"
+    "chrono": "cpp",
+    "**/*oscr-firmware*/include/**.h": "cpp",
+    "**/*oscr-firmware*/databases/data/*.json": "json5",
   },
   "platformio-ide.toolbar": [
     {
@@ -46,5 +48,9 @@
       "commands": "platformio-ide.serialMonitor"
     }
   ],
-  "editor.tabSize": 2
+  "editor.tabSize": 2,
+  "python-envs.workspaceSearchPaths": [
+    "./**/.venv",
+    "~/.platformio/penv"
+  ]
 }

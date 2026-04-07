@@ -857,9 +857,15 @@
 
 /****/
 
-# if (defined(ENABLE_SERIAL_OUTPUT) || defined(ENABLE_UPDATER)) && (OPTION_SERIAL_OUTPUT == SERIAL_ASCII)
+# if (defined(ENABLE_SERIAL_OUTPUT) || defined(ENABLE_UPDATER))
 #   define HAS_SERIAL_OUT true
+#   if (OPTION_SERIAL_OUTPUT == SERIAL_ASCII)
+#     define HAS_SERIAL_ASCII_OUT true
+#   else
+#     define HAS_SERIAL_ASCII_OUT false
+#   endif
 # else
+#   define HAS_SERIAL_ASCII_OUT false
 #   define HAS_SERIAL_OUT false
 # endif
 

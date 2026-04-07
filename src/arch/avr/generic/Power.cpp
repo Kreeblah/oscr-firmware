@@ -50,8 +50,8 @@
 namespace
 {
   // MCU clock speeds
-  constexpr uint32_t const kClock16M = 16000000UL;  /*!< 16MHz clock speed */
-  constexpr uint32_t const kClock8M = 8000000UL;    /*!< 8MHz clock speed */
+  constexpr uint32_t const kClock16M = F_CPU;         /*!< 16MHz clock speed */
+  constexpr uint32_t const kClock8M = (F_CPU / 2);    /*!< 8MHz clock speed */
 
 # if defined(ENABLE_VSELECT)
 
