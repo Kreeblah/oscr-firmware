@@ -8,16 +8,7 @@ from platformio.package.lockfile import LockFile # pyright: ignore[reportMissing
 from platformio.package.download import FileDownloader # pyright: ignore[reportMissingImports]
 from platformio.package.unpack import FileUnpacker # pyright: ignore[reportMissingImports]
 from platformio.package.exception import PackageException # pyright: ignore[reportMissingImports]
-from SCons.Script import ARGUMENTS # pyright: ignore[reportMissingImports]
 import tcutils
-
-Import("env") # pyright: ignore[reportUndefinedVariable]
-if not env: # pyright: ignore[reportUndefinedVariable]
-  env = {}
-  click.echo("Internal error: No env", err=True)
-  exit(1)
-
-VERBOSE = int(ARGUMENTS.get("PIOVERBOSE", 0))
 
 PROJECT_ROOT = getcwd()
 TOOLCHAIN_ROOT = tcutils.Dir()
